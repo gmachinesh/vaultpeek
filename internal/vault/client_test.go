@@ -52,3 +52,15 @@ func TestNewClient_Success(t *testing.T) {
 		t.Errorf("expected env %q, got %q", "dev", client.Env)
 	}
 }
+
+func TestNewClient_TokenFromEnv(t *testing.T) {
+	t.Setenv("VAULT_ADDR", "")
+	t.Setenv("VAULT_TOKEN", "env-token")
+	client, err := NewClient(Config{Address: "http://127.0.0.1:8200"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if client.Token != "env-token" {
+		t.Errorf("expected token %q from env, got %q", "env-token", client.Token)
+	}
+}
