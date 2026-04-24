@@ -26,6 +26,10 @@ func runRename(cmd *cobra.Command, args []string) error {
 	srcPath := args[0]
 	dstPath := args[1]
 
+	if srcPath == dstPath {
+		return fmt.Errorf("source and destination paths are the same: %q", srcPath)
+	}
+
 	addr := os.Getenv("VAULT_ADDR")
 	token := os.Getenv("VAULT_TOKEN")
 
