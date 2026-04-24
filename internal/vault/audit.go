@@ -1,31 +1,34 @@
 package vault
 
 import (
-	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
-// AuditEntry represents a single recorded secret operation.
+// AuditEntry records a single operation performed against Vault.
 type AuditEntry struct {
 	Timestamp time.Time
 	Operation string
 	Mount     string
 	Path      string
-	Error     string
+	Error     error
 }
 
 // String returns a human-readable representation of the audit entry.
 func (e AuditEntry) String() string {
-	ts := e.Timestamp.Format(time.RFC3339)
-	if e.Error != "" {
-		return fmt.Sprintf("[%s] %s %s/%s ERROR: %s", ts, e.Operation, e.Mount, e.Path, e.Error)
+	status := "OK"
+	if e.Error != nil {
+		status = fmt.Sprintf("ERROR: %s", e.Error.Error())
 	}
-	return fmt.Sprintf("[%s] %s %s/%s OK", ts, e.Operation, e.Mount, e.Path)
+	return fmt.Sprintf("[%s] %s %s/%s -> %s",
+		e.Timestamp.UTC().Format(time.RFC3339),
+		e.Operation, e.Mount, e.Path, status)
 }
 
-// AuditLog holds an in-memory list of audit entries.
+// AuditLog is a thread-safe in-memory log of vault operations.
 type AuditLog struct {
+	mu      sync.Mutex
 	entries []AuditEntry
 }
 
@@ -34,45 +37,34 @@ func NewAuditLog() *AuditLog {
 	return &AuditLog{}
 }
 
-// Record appends a new entry to the audit log.
-func (a *AuditLog) Record(op, mount, path string, err error) {
-	entry := AuditEntry{
-		Timestamp: time.Now().UTC(),
+// Record appends an entry to the audit log.
+func (l *AuditLog) Record(op, mount, path string, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entries = append(l.entries, AuditEntry{
+		Timestamp: time.Now(),
 		Operation: op,
 		Mount:     mount,
 		Path:      path,
-	}
-	if err != nil {
-		entry.Error = err.Error()
-	}
-	a.entries = append(a.entries, entry)
+		Error:     err,
+	})
 }
 
-// Entries returns a copy of all recorded audit entries.
-func (a *AuditLog) Entries() []AuditEntry {
-	out := make([]AuditEntry, len(a.entries))
-	copy(out, a.entries)
-	return out
+// Entries returns a snapshot copy of all audit entries.
+func (l *AuditLog) Entries() []AuditEntry {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	copy := make([]AuditEntry, len(l.entries))
+	for i, e := range l.entries {
+		copy[i] = e
+	}
+	return copy
 }
 
-// FetchAuditLog retrieves recent audit log entries from the Vault audit device.
-// It returns an error if the Vault API call fails or the audit device is unavailable.
-func FetchAuditLog(ctx context.Context, c *Client) ([]AuditEntry, error) {
-	secret, err := c.Logical().ReadWithContext(ctx, "sys/audit")
-	if err != nil {
-		return nil, fmt.Errorf("reading audit devices: %w", err)
+// FetchAuditLog retrieves the current entries from the log and returns them.
+func FetchAuditLog(log *AuditLog) []AuditEntry {
+	if log == nil {
+		return nil
 	}
-	if secret == nil || secret.Data == nil {
-		return nil, nil
-	}
-	var entries []AuditEntry
-	for key := range secret.Data {
-		entries = append(entries, AuditEntry{
-			Timestamp: time.Now().UTC(),
-			Operation: "audit-device",
-			Mount:     key,
-			Path:      "sys/audit",
-		})
-	}
-	return entries, nil
+	return log.Entries()
 }
