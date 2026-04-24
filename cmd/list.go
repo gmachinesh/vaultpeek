@@ -32,6 +32,13 @@ func runList(cmd *cobra.Command, args []string) error {
 	address := os.Getenv("VAULT_ADDR")
 	token := os.Getenv("VAULT_TOKEN")
 
+	if address == "" {
+		return fmt.Errorf("VAULT_ADDR environment variable is not set")
+	}
+	if token == "" {
+		return fmt.Errorf("VAULT_TOKEN environment variable is not set")
+	}
+
 	client, err := vault.NewClient(address, token)
 	if err != nil {
 		return fmt.Errorf("creating vault client: %w", err)
