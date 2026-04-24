@@ -59,3 +59,10 @@ func TestDeleteSecret_EmptyPath(t *testing.T) {
 		t.Fatal("expected error for empty path")
 	}
 }
+
+func TestDeleteSecret_NilClient(t *testing.T) {
+	err := DeleteSecret(context.Background(), nil, "secret", "myapp/config")
+	if err == nil {
+		t.Fatal("expected error for nil client, got nil")
+	}
+}
