@@ -29,14 +29,9 @@ func init() {
 }
 
 func runList(cmd *cobra.Command, args []string) error {
-	address := os.Getenv("VAULT_ADDR")
-	token := os.Getenv("VAULT_TOKEN")
-
-	if address == "" {
-		return fmt.Errorf("VAULT_ADDR environment variable is not set")
-	}
-	if token == "" {
-		return fmt.Errorf("VAULT_TOKEN environment variable is not set")
+	address, token, err := resolveVaultEnv()
+	if err != nil {
+		return err
 	}
 
 	client, err := vault.NewClient(address, token)
@@ -58,4 +53,19 @@ func runList(cmd *cobra.Command, args []string) error {
 		fmt.Println(k)
 	}
 	return nil
+}
+
+// resolveVaultEnv reads and validates the VAULT_ADDR and VAULT_TOKEN
+// environment variables required to communicate with a Vault server.
+func resolveVaultEnv() (address, token string, err error) {
+	address = os.Getenv("VAULT_ADDR")
+	token = os.Getenv("VAULT_TOKEN")
+
+	if address == "" {
+		return "", "", fmt.Errorf("VAULT_ADDR environment variable is not set")
+	}
+	if token == "" {
+		return "", "", fmt.Errorf("VAULT_TOKEN environment variable is not set")
+	}
+	return address, token, nil
 }
